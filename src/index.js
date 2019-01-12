@@ -1,10 +1,21 @@
+import { createElement, render } from './dom';
 import './index.sass';
 
-const header = document.createElement('h1');
-header.innerText = 'Minimal Bundle';
+const main = async () => {
+  const renderToBody = render(document.body);
 
-const root = document.createElement('div');
-root.innerText = 'Hello there! This is a pretty small bundle!';
+  const header = createElement('h1', {}, 'Minimal Bundle');
+  const info = createElement(
+    'div',
+    {},
+    'Hello there! This is a pretty small bundle!',
+  );
 
-document.body.appendChild(header);
-document.body.appendChild(root);
+  renderToBody(header, info);
+
+  const additionalNote = (await import('./additionalNote')).default;
+
+  renderToBody(additionalNote);
+};
+
+main();
