@@ -85,6 +85,9 @@ module.exports = (env, argv) => {
         test: /\.(eot|svg|ttf|woff|woff2)$/,
         exclude: /node_modules/,
         loader: 'file-loader',
+        options: {
+          name: 'assets/[name].[hash].[ext]',
+        },
       }],
     },
     plugins: [
@@ -120,8 +123,12 @@ module.exports = (env, argv) => {
         background_color: '#000000',
       }),
       new MiniCssExtractPlugin({
-        filename: isDev ? '[name].css' : '[name].[hash].css',
-        chunkFilename: isDev ? '[id].css' : '[id].[hash].css',
+        filename: isDev
+          ? 'styles/[name].bundle.css'
+          : 'styles/[name].[contenthash].bundle.css',
+        chunkFilename: isDev
+          ? 'styles/[name].chunk.css'
+          : 'styles/[name].[contenthash].chunk.css',
       }),
       new BrotliPlugin(compOptions),
       new CompressionPlugin(compOptions),
@@ -174,11 +181,11 @@ module.exports = (env, argv) => {
     },
     output: {
       filename: isDev
-        ? '[name].bundle.js'
-        : '[name].[chunkhash].bundle.js',
+        ? 'js/[name].bundle.js'
+        : 'js/[name].[chunkhash].bundle.js',
       chunkFilename: isDev
-        ? '[name].chunk.js'
-        : '[name].[chunkhash].chunk.js',
+        ? 'js/[name].chunk.js'
+        : 'js/[name].[chunkhash].chunk.js',
       path: path.resolve(__dirname, './dist/static'),
     },
   };
