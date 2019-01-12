@@ -72,7 +72,7 @@
     "no-prototype-builtins": 0,
     "max-len": [
       "error",
-      100
+      80
     ],
     "arrow-body-style": [
       "error",
