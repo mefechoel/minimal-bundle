@@ -1,3 +1,4 @@
+import '../polyfillModern';
 import { createElement, render } from './dom';
 import './index.sass';
 
@@ -12,6 +13,9 @@ const main = async () => {
   );
 
   renderToBody(header, info);
+
+  // eslint-disable-next-line no-console
+  requestIdleCallback(() => console.log('I\'m so bored...'));
 
   const additionalNote = (await import('./additionalNote')).default;
 
