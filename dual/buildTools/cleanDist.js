@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const chalk = require('chalk');
 const { existsSync } = require('fs');
 const rimraf = require('rimraf');
