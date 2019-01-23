@@ -4,6 +4,7 @@ import Map from 'es6-map';
 import { fetch } from 'whatwg-fetch';
 import 'raf/polyfill';
 import 'es6-symbol/implement';
+import 'iterators-polyfill';
 import './ArrayFrom';
 import './ObjectAssign';
 

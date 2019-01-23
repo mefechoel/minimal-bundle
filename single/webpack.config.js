@@ -15,8 +15,8 @@ const CompressionPlugin = require('compression-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const manifest = require('./src/manifest');
 
-// Find the polyfill chunk
-const polyfillRegex = /(\w|\W)*polyfill\.(\w|\W)*\.js/;
+// Find the legacyPolyfill chunk
+const legacyPolyfillRegex = /(\w|\W)*legacyPolyfill\.(\w|\W)*\.js/;
 
 // Compress all text based files
 const compOptions = {
@@ -38,11 +38,16 @@ module.exports = (env, argv) => {
       // RegeneratorRuntime will be needed by all browsers to execute
       // transpiles async/await
       runtime: './runtime/index.js',
-      // Polyfills are packaged in a seperate bundle because they are only
-      // needed by legacy browsers. They will be loaded with a script tag
+      // Legacy polyfills are packaged in a seperate bundle because they are
+      // only needed by legacy browsers. They will be loaded with a script tag
       // with the 'nomodule' attribute, so modern browsers won't download
       // the bundle
-      polyfill: './polyfill/index.js',
+      legacyPolyfill: './legacyPolyfill/index.js',
+      // Modern polyfills will be needed by every browser to support es>6
+      // features, like requestIdleCallback, which are not widely supported,
+      // yet. This bundle will be very small, though, and won't bloat your
+      // application size. Maybe you won't need it at all
+      modernPolyfill: './modernPolyfill/index.js',
       // Main bundle
       main: './src/index.js',
     },
@@ -114,7 +119,7 @@ module.exports = (env, argv) => {
       // More readable webpack output on dev builds
       new FriendlyErrorsPlugin(),
       // Remove old build folder before build
-      new CleanWebpackPlugin(['dist']),
+      ...(!isDev ? [new CleanWebpackPlugin(['dist'])] : []),
       // Use template html and minify output
       new HtmlWebpackPlugin({
         template: 'public/index.html',
@@ -133,12 +138,12 @@ module.exports = (env, argv) => {
           }
           : false,
       }),
-      // Set 'nomodule' attribute on polyfill script tag,
-      // so newer browsers, which do not need the polyfills,
+      // Set 'nomodule' attribute on legacyPolyfill script tag,
+      // so newer browsers, which do not need the legacy polyfills,
       // won't download the script
       new ScriptExtHtmlPlugin({
         custom: {
-          test: polyfillRegex,
+          test: legacyPolyfillRegex,
           attribute: 'nomodule',
         },
       }),
@@ -172,7 +177,11 @@ module.exports = (env, argv) => {
       splitChunks: {
         // Do not split polyfill and regeneratorRuntime libraries
         // out of scripts, since they will likely not change
-        chunks: ({ name }) => name !== 'polyfill' && name !== 'runtime',
+        chunks: ({ name }) => (
+          name !== 'legacyPolyfill' &&
+          name !== 'modernPolyfill' &&
+          name !== 'runtime'
+        ),
       },
       minimizer: [
         // Minify js files
