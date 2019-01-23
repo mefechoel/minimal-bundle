@@ -1,4 +1,3 @@
-import '../polyfillModern';
 import { createElement, render } from './dom';
 import './index.sass';
 
