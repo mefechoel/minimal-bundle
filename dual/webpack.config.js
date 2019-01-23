@@ -1,6 +1,5 @@
 /* eslint-disable camelcase */
 const path = require('path');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const ScriptExtHtmlPlugin = require('script-ext-html-webpack-plugin');
 const WebpackPwaManifest = require('webpack-pwa-manifest');
@@ -29,19 +28,30 @@ module.exports = (env, argv) => {
   const isLegacyBuild = process.env.LEGACY_BUILD === 'true' || isDev;
 
   const entryLegacy = {
-    // RegeneratorRuntime will be needed by all browsers to execute
-    // transpiles async/await
+    // RegeneratorRuntime will only be needed by legacy browsers to execute
+    // transpiles async/await, since the modern bundle does not transpile
+    // async/await
     runtime: './runtime/index.js',
-    // Polyfills are packaged in a seperate bundle because they are only
-    // needed by legacy browsers. They will be loaded with a script tag
-    // with the 'nomodule' attribute, so modern browsers won't download
-    // the bundle
-    polyfill: './polyfill/index.js',
-    // Main bundle
+    // Legacy polyfills to provide es6 functionality, that all modern browsers
+    // support already.
+    legacyPolyfill: './legacyPolyfill/index.js',
+    // Modern polyfills will be needed by every browser to support es>6
+    // features, like requestIdleCallback, which are not widely supported,
+    // yet. This bundle will be very small, though, and won't bloat your
+    // application size. Maybe you won't need it at all
+    modernPolyfill: './modernPolyfill/index.js',
+    // Main bundle, heavily transpiled
     main: './src/index.js',
   };
 
   const entryModern = {
+    // We bundle the modern polyfills as well, so we can ship a near
+    // untranspiled version for modern browsers. This does not really
+    // make a difference to the bundle size in this case, but we'll do
+    // it for consistency
+    modernPolyfill: './modernPolyfill/index.js',
+    // Main bundle, barely transpiled at all, since browsers, that support
+    // modules also support most of es>=6
     main: './src/index.js',
   };
 
@@ -56,6 +66,7 @@ module.exports = (env, argv) => {
     ],
   };
 
+  // Target browsers that support modules
   const babelEnvTargetsModern = {
     esmodules: true,
   };
@@ -64,13 +75,36 @@ module.exports = (env, argv) => {
     ? babelEnvTargetsLegacy
     : babelEnvTargetsModern;
 
+  // Set 'nomodule' attribute on legacyPolyfill, runtime and
+  // legacy main script tag, so newer browsers, which support
+  // the polyfilled features and modern js syntax won't download
+  // the scripts
+  const scriptExtConfigLegacy = {
+    custom: {
+      test: isDev
+        ? /(\w|\W)*legacyPolyfill\.?(\w|\W)*\.js/
+        : /(\w|\W)*\.js/,
+      attribute: 'nomodule',
+    },
+  };
+
+  // Add the module type to all modern bundles
+  const scriptExtConfigModern = {
+    module: /(\w|\W)*\.js/,
+  };
+
+  const scriptExtConfig = isLegacyBuild
+    ? scriptExtConfigLegacy
+    : scriptExtConfigModern;
+
+  // Prefix bundles, so we can distinguish between the modern and
+  // the legacy main bundle
   let prefix = isLegacyBuild ? 'legacy.' : 'modern.';
   if (isDev) prefix = '';
 
   return {
     mode: isProd ? 'production' : 'development',
-    // Create seperate bundles for each part we need to make the app
-    // as compatible with all browsers as possible
+    // Use legacy entry in first build, modern entry in second build
     entry,
     devtool: isDev ? 'source-map' : false,
     devServer: {
@@ -134,11 +168,11 @@ module.exports = (env, argv) => {
     plugins: [
       // More readable webpack output on dev builds
       new FriendlyErrorsPlugin(),
-      // Remove old build folder before build
-      ...(isDev ? [new CleanWebpackPlugin(['dist'])] : []),
       // Use template html and minify output
       new HtmlWebpackPlugin({
         template: 'public/index.html',
+        // Prefix html, so we can join the modern script tags
+        // into the legay html
         filename: `${prefix}index.html`,
         minify: isProd
           ? {
@@ -155,22 +189,7 @@ module.exports = (env, argv) => {
           }
           : false,
       }),
-      // Set 'nomodule' attribute on polyfill script tag,
-      // so newer browsers, which do not need the polyfills,
-      // won't download the script
-      ...(isLegacyBuild
-        ? [
-          new ScriptExtHtmlPlugin({
-            custom: {
-              test: isDev
-                ? /(\w|\W)*polyfill\.?(\w|\W)*\.js/
-                : /(\w|\W)*\.js/,
-              attribute: 'nomodule',
-            },
-          }),
-        ]
-        : []
-      ),
+      new ScriptExtHtmlPlugin(scriptExtConfig),
       // Generate manifest file
       new WebpackPwaManifest(manifest),
       // Extract css files into one css bundle
@@ -201,7 +220,11 @@ module.exports = (env, argv) => {
       splitChunks: {
         // Do not split polyfill and regeneratorRuntime libraries
         // out of scripts, since they will likely not change
-        chunks: ({ name }) => name !== 'polyfill' && name !== 'runtime',
+        chunks: ({ name }) => (
+          name !== 'legacyPolyfill' &&
+          name !== 'modernPolyfill' &&
+          name !== 'runtime'
+        ),
       },
       minimizer: [
         // Minify js files
@@ -211,6 +234,8 @@ module.exports = (env, argv) => {
               ecma: 8,
             },
             compress: {
+              // We can take advantage of new and shorter js syntax
+              // when minifying the modern bundle
               ecma: isLegacyBuild ? 5 : 6,
               warnings: false,
               comparisons: false,
