@@ -13,6 +13,8 @@ const safePostCssParser = require('postcss-safe-parser');
 const BrotliPlugin = require('brotli-webpack-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+const Fiber = require('fibers');
+const dartSass = require('sass');
 const manifest = require('./src/manifest');
 
 // Find the legacyPolyfill chunk
@@ -59,61 +61,77 @@ module.exports = (env, argv) => {
       quiet: true,
     },
     module: {
-      rules: [{
-        // Show eslint warnings in build and in browser console
-        enforce: 'pre',
-        test: /\.js$/,
-        exclude: /node_modules/,
-        loader: 'eslint-loader',
-        options: {
-          formatter: require('eslint-formatter-friendly'),
-          emitWarning: true,
-        },
-      }, {
-        test: /\.js$/,
-        use: [{
-          loader: 'babel-loader',
+      rules: [
+        {
+          // Show eslint warnings in build and in browser console
+          enforce: 'pre',
+          test: /\.js$/,
+          exclude: /node_modules/,
+          loader: 'eslint-loader',
           options: {
-            presets: [['@babel/preset-env', {
-              targets: {
-                browsers: [
-                  '> 1%',
-                  'not dead',
-                ],
-              },
-            }]],
-            // Support for dynamic imports
-            plugins: ['@babel/plugin-syntax-dynamic-import'],
+            formatter: require('eslint-formatter-friendly'),
+            emitWarning: true,
           },
-        }],
-      }, {
-        // Include and compile and prefix .sass files
-        test: /\.sass$/,
-        use: [
-          isDev ? 'style-loader' : MiniCssExtractPlugin.loader,
-          'css-loader',
-          'resolve-url-loader',
-          'postcss-loader',
-          'sass-loader',
-        ],
-      }, {
-        // Include and prefix .css files
-        test: /\.css$/,
-        use: [
-          isDev ? 'style-loader' : MiniCssExtractPlugin.loader,
-          'css-loader',
-          'resolve-url-loader',
-          'postcss-loader',
-        ],
-      }, {
-        // Load fonts
-        test: /\.(eot|svg|ttf|woff|woff2)$/,
-        exclude: /node_modules/,
-        loader: 'file-loader',
-        options: {
-          name: 'assets/[name].[hash].[ext]',
         },
-      }],
+        {
+          test: /\.js$/,
+          use: [
+            {
+              loader: 'babel-loader',
+              options: {
+                presets: [
+                  [
+                    '@babel/preset-env',
+                    {
+                      targets: {
+                        browsers: ['> 1%', 'not dead'],
+                      },
+                    },
+                  ],
+                ],
+                // Support for dynamic imports
+                plugins: ['@babel/plugin-syntax-dynamic-import'],
+              },
+            },
+          ],
+        },
+        {
+          // Include and compile and prefix .sass files
+          test: /\.sass$/,
+          use: [
+            isDev ? 'style-loader' : MiniCssExtractPlugin.loader,
+            'css-loader',
+            'resolve-url-loader',
+            'postcss-loader',
+            {
+              loader: 'sass-loader',
+              options: {
+                implementation: dartSass,
+                fiber: Fiber,
+              },
+            },
+          ],
+        },
+        {
+          // Include and prefix .css files
+          test: /\.css$/,
+          use: [
+            isDev ? 'style-loader' : MiniCssExtractPlugin.loader,
+            'css-loader',
+            'resolve-url-loader',
+            'postcss-loader',
+          ],
+        },
+        {
+          // Load fonts
+          test: /\.(eot|svg|ttf|woff|woff2)$/,
+          exclude: /node_modules/,
+          loader: 'file-loader',
+          options: {
+            name: 'assets/[name].[hash].[ext]',
+          },
+        },
+      ],
     },
     plugins: [
       // More readable webpack output on dev builds
@@ -177,11 +195,10 @@ module.exports = (env, argv) => {
       splitChunks: {
         // Do not split polyfill and regeneratorRuntime libraries
         // out of scripts, since they will likely not change
-        chunks: ({ name }) => (
+        chunks: ({ name }) =>
           name !== 'legacyPolyfill' &&
           name !== 'modernPolyfill' &&
-          name !== 'runtime'
-        ),
+          name !== 'runtime',
       },
       minimizer: [
         // Minify js files
@@ -221,10 +238,10 @@ module.exports = (env, argv) => {
     },
     output: {
       filename: isDev
-        // Don't hash file in development mode for better build performance
-        ? 'js/[name].bundle.js'
-        // Hash files in production for better caching
-        : 'js/[name].[chunkhash].bundle.js',
+        ? // Don't hash file in development mode for better build performance
+        'js/[name].bundle.js'
+        : // Hash files in production for better caching
+        'js/[name].[chunkhash].bundle.js',
       chunkFilename: isDev
         ? 'js/[name].chunk.js'
         : 'js/[name].[chunkhash].chunk.js',
